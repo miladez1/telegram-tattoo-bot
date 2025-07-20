@@ -68,18 +68,8 @@ def button_handler(update: Update, context: CallbackContext):
     
     if query.data == 'ai_design':
         return start_ai_design(query, context)
-    elif query.data == 'book_appointment':
-        show_available_slots(query, context)
     elif query.data == 'contact':
         show_contact_info(query, context)
-    elif query.data.startswith('book_slot_'):
-        slot_id = int(query.data.split('_')[2])
-        return book_slot(query, context, slot_id)
-    elif query.data.startswith('book_discount_'):
-        slot_id = int(query.data.split('_')[2])
-        return book_slot_with_discount(query, context, slot_id)
-    elif query.data == 'book_appointment_discount':
-        return book_slot_with_discount(query, context, None)
     elif query.data == 'back_to_main':
         back_to_main_menu(query, context)
     
@@ -277,7 +267,7 @@ def call_ai_api(description):
             description = translate_persian_to_english(description)
             logger.info(f"Translated Persian text: '{original_description}' -> '{description}'")
         
-        # ClipDrop API implementation
+        # ClipDrop API implementation - using files parameter as required by API
         headers = {
             'x-api-key': api_key,
         }
@@ -285,10 +275,8 @@ def call_ai_api(description):
         # Prepare the prompt for tattoo design
         tattoo_prompt = f"Black and white tattoo design: {description}, detailed line art, tattoo style, clean lines, professional tattoo artwork"
         
-        data = {
-            'prompt': tattoo_prompt,
-            'width': 512,
-            'height': 512,
+        files = {
+            'prompt': (None, tattoo_prompt, 'text/plain')
         }
         
         logger.info(f"Calling ClipDrop API with prompt: {tattoo_prompt}")
@@ -296,7 +284,7 @@ def call_ai_api(description):
         response = requests.post(
             AI_API_CONFIG['api_url'], 
             headers=headers, 
-            data=data,
+            files=files,
             timeout=30
         )
         
@@ -339,10 +327,19 @@ def show_available_slots(query, context):
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
     if not slots:
-        query.edit_message_text(
-            no_slots_message,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as e:
+            logger.warning(f"Could not edit message, sending new message: {e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     keyboard = []
@@ -351,10 +348,19 @@ def show_available_slots(query, context):
     
     keyboard.append([InlineKeyboardButton(back_button_text, callback_data='back_to_main')])
     
-    query.edit_message_text(
-        select_slot_message,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            select_slot_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=select_slot_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 def book_slot(query, context, slot_id, discount=False):
     """Book an appointment slot"""
@@ -374,10 +380,19 @@ def book_slot(query, context, slot_id, discount=False):
     cancel_button_text = db.get_setting('cancel_button') or PERSIAN_TEXTS['cancel_button']
     
     if not slot_text:
-        query.edit_message_text(
-            slot_unavailable_message,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                slot_unavailable_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as e:
+            logger.warning(f"Could not edit message, sending new message: {e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=slot_unavailable_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     # Create reservation
@@ -387,10 +402,19 @@ def book_slot(query, context, slot_id, discount=False):
         context.user_data['selected_slot_text'] = slot_text
     except Exception as e:
         logger.error(f"Error creating reservation: {e}")
-        query.edit_message_text(
-            "خطا در ایجاد رزرو. لطفاً دوباره تلاش کنید.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                "خطا در ایجاد رزرو. لطفاً دوباره تلاش کنید.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as edit_e:
+            logger.warning(f"Could not edit message, sending new message: {edit_e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="خطا در ایجاد رزرو. لطفاً دوباره تلاش کنید.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     # Get payment details
@@ -420,10 +444,19 @@ def book_slot(query, context, slot_id, discount=False):
 
 لطفاً اسکرین‌شات رسید را در همین چت ارسال کنید."""
     
-    query.edit_message_text(
-        payment_message,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{cancel_button_text} رزرو", callback_data='back_to_main')]])
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            payment_message,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{cancel_button_text} رزرو", callback_data='back_to_main')]])
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=payment_message,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{cancel_button_text} رزرو", callback_data='back_to_main')]])
+        )
     
     return BOOKING_RECEIPT_UPLOAD
 
