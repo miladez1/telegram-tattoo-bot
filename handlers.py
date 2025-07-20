@@ -18,7 +18,11 @@ db = Database()
 def start(update: Update, context: CallbackContext):
     """Start command handler"""
     user = update.effective_user
-    db.add_user(user.id, user.first_name, user.username)
+    
+    try:
+        db.add_user(user.id, user.first_name, user.username)
+    except Exception as e:
+        logger.error(f"Error adding user {user.id}: {e}")
     
     # Check forced subscription
     force_channel = db.get_setting('force_join_channel')
@@ -33,19 +37,26 @@ def start(update: Update, context: CallbackContext):
                     reply_markup=reply_markup
                 )
                 return
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"Error checking channel membership: {e}")
     
     welcome_message = db.get_setting('welcome_message')
+    
+    # Get button texts from database
+    ai_design_text = db.get_setting('button_ai_design') or PERSIAN_TEXTS['main_menu_buttons']['ai_design']
+    book_appointment_text = db.get_setting('button_book_appointment') or PERSIAN_TEXTS['main_menu_buttons']['book_appointment']
+    contact_text = db.get_setting('button_contact') or PERSIAN_TEXTS['main_menu_buttons']['contact']
+    admin_panel_text = db.get_setting('button_admin_panel') or PERSIAN_TEXTS['main_menu_buttons']['admin_panel']
+    
     keyboard = [
-        [InlineKeyboardButton("🎨 طراحی طرح تتو با هوش مصنوعی", callback_data='ai_design')],
-        [InlineKeyboardButton("📅 رزرو وقت تتو", callback_data='book_appointment')],
-        [InlineKeyboardButton("📞 تماس با ما", callback_data='contact')]
+        [InlineKeyboardButton(ai_design_text, callback_data='ai_design')],
+        [InlineKeyboardButton(book_appointment_text, callback_data='book_appointment')],
+        [InlineKeyboardButton(contact_text, callback_data='contact')]
     ]
     
     # Add admin panel button for admins
     if user.id in ADMIN_IDS:
-        keyboard.append([InlineKeyboardButton("👑 پنل مدیریت", callback_data='admin_panel')])
+        keyboard.append([InlineKeyboardButton(admin_panel_text, callback_data='admin_panel')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     update.message.reply_text(welcome_message, reply_markup=reply_markup)
@@ -72,9 +83,12 @@ def button_handler(update: Update, context: CallbackContext):
 
 def start_ai_design(query, context):
     """Start AI design conversation"""
+    ai_prompt = db.get_setting('ai_design_prompt') or PERSIAN_TEXTS['ai_design_prompt']
+    back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
+    
     query.edit_message_text(
-        "لطفاً توضیحات کاملی از طرحی که در ذهن دارید بنویسید (مثلاً: یک شیر با تاج به سبک رئالیسم روی ساعد دست).",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_main')]])
+        ai_prompt,
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
     )
     return AI_DESIGN_DESCRIPTION
 
@@ -82,72 +96,132 @@ def handle_ai_design_description(update: Update, context: CallbackContext):
     """Process AI design description"""
     description = update.message.text
     
-    # Show processing message
-    processing_msg = update.message.reply_text("در حال ساخت طرح شما... لطفاً چند لحظه صبر کنید.")
+    # Get configurable messages
+    processing_message = db.get_setting('ai_design_processing') or PERSIAN_TEXTS['ai_design_processing']
+    result_message = db.get_setting('ai_design_result') or PERSIAN_TEXTS['ai_design_result']
+    error_message = db.get_setting('ai_design_error') or PERSIAN_TEXTS['ai_design_error']
+    discount_button_text = db.get_setting('booking_discount_button') or PERSIAN_TEXTS['booking_discount_button']
+    back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
-    # Call AI API (mock implementation - replace with actual API)
+    # Show processing message
+    processing_msg = update.message.reply_text(processing_message)
+    
+    # Call AI API
     try:
-        generated_image_url = call_ai_api(description)
+        generated_image_path = call_ai_api(description)
         
-        if generated_image_url:
+        if generated_image_path:
             # Delete processing message
-            context.bot.delete_message(
-                chat_id=processing_msg.chat_id,
-                message_id=processing_msg.message_id
-            )
+            try:
+                context.bot.delete_message(
+                    chat_id=processing_msg.chat_id,
+                    message_id=processing_msg.message_id
+                )
+            except Exception as e:
+                logger.warning(f"Could not delete processing message: {e}")
             
             # Send generated image with discount offer
-            keyboard = [[InlineKeyboardButton("📅 رزرو وقت برای اجرای این طرح (با ۱۰٪ تخفیف)", callback_data='book_appointment_discount')]]
+            keyboard = [[InlineKeyboardButton(discount_button_text, callback_data='book_appointment_discount')]]
             reply_markup = InlineKeyboardMarkup(keyboard)
             
-            update.message.reply_photo(
-                photo=generated_image_url,
-                caption="طرح شما آماده شد! ✨\n\nاگر برای اجرای همین طرح وقت رزرو کنید، ۱۰٪ تخفیف ویژه دریافت خواهید کرد.",
-                reply_markup=reply_markup
-            )
+            try:
+                # Send photo from local file
+                with open(generated_image_path, 'rb') as photo_file:
+                    update.message.reply_photo(
+                        photo=photo_file,
+                        caption=result_message,
+                        reply_markup=reply_markup
+                    )
+                
+                # Clean up temporary file
+                import os
+                try:
+                    os.unlink(generated_image_path)
+                    logger.info(f"Cleaned up temporary file: {generated_image_path}")
+                except Exception as e:
+                    logger.warning(f"Could not clean up temporary file {generated_image_path}: {e}")
+                    
+            except Exception as e:
+                logger.error(f"Error sending generated image: {e}")
+                raise Exception("Error sending image")
         else:
             raise Exception("API call failed")
             
     except Exception as e:
         logger.error(f"AI API error: {e}")
-        processing_msg.edit_text(
-            "متاسفانه در ساخت طرح مشکلی پیش آمد. لطفاً دوباره تلاش کنید.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_main')]])
-        )
+        try:
+            processing_msg.edit_text(
+                error_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as edit_e:
+            logger.error(f"Could not edit processing message: {edit_e}")
+            update.message.reply_text(
+                error_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
     
     return ConversationHandler.END
 
 def call_ai_api(description):
-    """Call AI API to generate tattoo design (mock implementation)"""
+    """Call ClipDrop API to generate tattoo design"""
     api_key = db.get_setting('ai_api_key')
     
     if not api_key:
+        logger.error("AI API key not set")
         return None
     
-    # This is a mock implementation
-    # Replace with actual AI API call (OpenAI DALL-E, Stability AI, etc.)
     try:
+        # ClipDrop API implementation
         headers = {
-            'Authorization': f'Bearer {api_key}',
-            'Content-Type': 'application/json'
+            'x-api-key': api_key,
         }
+        
+        # Prepare the prompt for tattoo design
+        tattoo_prompt = f"Black and white tattoo design: {description}, detailed line art, tattoo style, clean lines, professional tattoo artwork"
         
         data = {
-            'prompt': f"Tattoo design: {description}",
-            'n': 1,
-            'size': '1024x1024'
+            'prompt': tattoo_prompt,
+            'width': 512,
+            'height': 512,
         }
         
-        # Mock response - replace with actual API call
-        # response = requests.post(AI_API_CONFIG['api_url'], headers=headers, json=data)
-        # if response.status_code == 200:
-        #     return response.json()['data'][0]['url']
+        logger.info(f"Calling ClipDrop API with prompt: {tattoo_prompt}")
         
-        # For testing, return a placeholder image
-        return "https://via.placeholder.com/512x512.png?text=Generated+Tattoo+Design"
+        response = requests.post(
+            AI_API_CONFIG['api_url'], 
+            headers=headers, 
+            data=data,
+            timeout=30
+        )
         
+        if response.status_code == 200:
+            # Save the image temporarily and get URL
+            import tempfile
+            import os
+            
+            # Create temporary file
+            temp_dir = '/tmp'
+            os.makedirs(temp_dir, exist_ok=True)
+            
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.png', dir=temp_dir) as temp_file:
+                temp_file.write(response.content)
+                temp_filename = temp_file.name
+            
+            logger.info(f"ClipDrop API call successful, image saved to: {temp_filename}")
+            return temp_filename  # Return local file path for telegram to upload
+        else:
+            logger.error(f"ClipDrop API error: {response.status_code}, {response.text}")
+            return None
+            
+    except requests.exceptions.Timeout:
+        logger.error("ClipDrop API call timed out")
+        return None
+    except requests.exceptions.ConnectionError:
+        logger.error("ClipDrop API connection error")
+        return None
     except Exception as e:
-        logger.error(f"AI API call failed: {e}")
+        logger.error(f"ClipDrop API call failed: {e}")
         return None
 
 def show_available_slots(query, context):
@@ -211,7 +285,7 @@ def book_slot(query, context, slot_id, discount=False):
     
     payment_message = f"""شما زمان {slot_text} را انتخاب کردید.
 
-این زمان به مدت ۳۰ دقیقه برای شما رزرو موقت شد.{discount_text}
+این زمان به مدت ۲ ساعت برای شما رزرو موقت شد.{discount_text}
 
 برای نهایی کردن رزرو، لطفاً مبلغ بیعانه به مقدار {deposit_amount} تومان را به شماره کارت زیر واریز کرده و از رسید پرداخت اسکرین‌شات بگیرید و ارسال کنید:
 
@@ -330,15 +404,21 @@ def back_to_main_menu(query, context):
     user = query.from_user
     welcome_message = db.get_setting('welcome_message')
     
+    # Get button texts from database
+    ai_design_text = db.get_setting('button_ai_design') or PERSIAN_TEXTS['main_menu_buttons']['ai_design']
+    book_appointment_text = db.get_setting('button_book_appointment') or PERSIAN_TEXTS['main_menu_buttons']['book_appointment']
+    contact_text = db.get_setting('button_contact') or PERSIAN_TEXTS['main_menu_buttons']['contact']
+    admin_panel_text = db.get_setting('button_admin_panel') or PERSIAN_TEXTS['main_menu_buttons']['admin_panel']
+    
     keyboard = [
-        [InlineKeyboardButton("🎨 طراحی طرح تتو با هوش مصنوعی", callback_data='ai_design')],
-        [InlineKeyboardButton("📅 رزرو وقت تتو", callback_data='book_appointment')],
-        [InlineKeyboardButton("📞 تماس با ما", callback_data='contact')]
+        [InlineKeyboardButton(ai_design_text, callback_data='ai_design')],
+        [InlineKeyboardButton(book_appointment_text, callback_data='book_appointment')],
+        [InlineKeyboardButton(contact_text, callback_data='contact')]
     ]
     
     # Add admin panel button for admins
     if user.id in ADMIN_IDS:
-        keyboard.append([InlineKeyboardButton("👑 پنل مدیریت", callback_data='admin_panel')])
+        keyboard.append([InlineKeyboardButton(admin_panel_text, callback_data='admin_panel')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
     query.edit_message_text(welcome_message, reply_markup=reply_markup)

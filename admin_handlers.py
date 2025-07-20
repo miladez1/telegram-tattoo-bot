@@ -13,6 +13,7 @@ ADMIN_ADD_SLOT = 1
 ADMIN_EDIT_SETTING = 2
 ADMIN_BROADCAST = 3
 ADMIN_SET_API_KEY = 4
+ADMIN_EDIT_TEXT = 5
 
 db = Database()
 
@@ -33,6 +34,7 @@ def admin_panel(update: Update, context: CallbackContext):
     keyboard = [
         [InlineKeyboardButton("⏰ مدیریت ساعات", callback_data='admin_slots')],
         [InlineKeyboardButton("✏️ تنظیمات متن‌ها", callback_data='admin_settings')],
+        [InlineKeyboardButton("🎨 مدیریت متون ربات", callback_data='admin_text_management')],
         [InlineKeyboardButton("📢 ارسال پیام همگانی", callback_data='admin_broadcast')],
         [InlineKeyboardButton("🔑 تنظیم کلید API", callback_data='admin_api_key')],
         [InlineKeyboardButton("📊 آمار ربات", callback_data='admin_stats')],
@@ -364,6 +366,212 @@ def admin_stats(update: Update, context: CallbackContext):
             "❌ خطا در دریافت آمار.",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='admin_panel')]])
         )
+
+def admin_text_management(update: Update, context: CallbackContext):
+    """Show comprehensive text management menu"""
+    query = update.callback_query
+    query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("💬 پیام‌های اصلی", callback_data='admin_main_messages')],
+        [InlineKeyboardButton("🎨 متون هوش مصنوعی", callback_data='admin_ai_messages')],
+        [InlineKeyboardButton("📅 متون رزرو", callback_data='admin_booking_messages')],
+        [InlineKeyboardButton("🔘 متون دکمه‌ها", callback_data='admin_button_texts')],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data='admin_panel')]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text("🎨 مدیریت جامع متون ربات\n\nکدام دسته از متون را ویرایش می‌کنید?", reply_markup=reply_markup)
+
+def admin_main_messages(update: Update, context: CallbackContext):
+    """Show main messages editing menu"""
+    query = update.callback_query
+    query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🌟 پیام خوشامدگویی", callback_data='edit_text_welcome_message')],
+        [InlineKeyboardButton("📞 اطلاعات تماس", callback_data='edit_text_contact_info')],
+        [InlineKeyboardButton("❌ پیام خطای عمومی", callback_data='edit_text_error_general')],
+        [InlineKeyboardButton("✅ پیام لغو عملیات", callback_data='edit_text_operation_cancelled')],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data='admin_text_management')]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text("💬 ویرایش پیام‌های اصلی", reply_markup=reply_markup)
+
+def admin_ai_messages(update: Update, context: CallbackContext):
+    """Show AI messages editing menu"""
+    query = update.callback_query
+    query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("❓ درخواست توضیح طرح", callback_data='edit_text_ai_design_prompt')],
+        [InlineKeyboardButton("⏳ پیام در حال پردازش", callback_data='edit_text_ai_design_processing')],
+        [InlineKeyboardButton("✨ پیام نتیجه", callback_data='edit_text_ai_design_result')],
+        [InlineKeyboardButton("⚠️ پیام خطا", callback_data='edit_text_ai_design_error')],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data='admin_text_management')]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text("🎨 ویرایش متون هوش مصنوعی", reply_markup=reply_markup)
+
+def admin_booking_messages(update: Update, context: CallbackContext):
+    """Show booking messages editing menu"""
+    query = update.callback_query
+    query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("📋 انتخاب زمان", callback_data='edit_text_booking_select_slot')],
+        [InlineKeyboardButton("❌ زمان موجود نیست", callback_data='edit_text_booking_no_slots')],
+        [InlineKeyboardButton("⚠️ زمان در دسترس نیست", callback_data='edit_text_booking_slot_unavailable')],
+        [InlineKeyboardButton("📸 درخواست رسید", callback_data='edit_text_booking_receipt_request')],
+        [InlineKeyboardButton("✅ رسید دریافت شد", callback_data='edit_text_booking_receipt_received')],
+        [InlineKeyboardButton("✅ رزرو تایید شد", callback_data='edit_text_booking_confirmed')],
+        [InlineKeyboardButton("❌ رزرو رد شد", callback_data='edit_text_booking_rejected')],
+        [InlineKeyboardButton("💰 انتخاب با تخفیف", callback_data='edit_text_booking_discount_select')],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data='admin_text_management')]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text("📅 ویرایش متون رزرو", reply_markup=reply_markup)
+
+def admin_button_texts(update: Update, context: CallbackContext):
+    """Show button texts editing menu"""
+    query = update.callback_query
+    query.answer()
+    
+    keyboard = [
+        [InlineKeyboardButton("🎨 دکمه طراحی", callback_data='edit_text_button_ai_design')],
+        [InlineKeyboardButton("📅 دکمه رزرو", callback_data='edit_text_button_book_appointment')],
+        [InlineKeyboardButton("📞 دکمه تماس", callback_data='edit_text_button_contact')],
+        [InlineKeyboardButton("👑 دکمه پنل ادمین", callback_data='edit_text_button_admin_panel')],
+        [InlineKeyboardButton("💰 دکمه رزرو با تخفیف", callback_data='edit_text_booking_discount_button')],
+        [InlineKeyboardButton("🔙 دکمه بازگشت", callback_data='edit_text_back_button')],
+        [InlineKeyboardButton("❌ دکمه لغو", callback_data='edit_text_cancel_button')],
+        [InlineKeyboardButton("✅ دکمه تایید ادمین", callback_data='edit_text_admin_approve_button')],
+        [InlineKeyboardButton("❌ دکمه رد ادمین", callback_data='edit_text_admin_reject_button')],
+        [InlineKeyboardButton("🔙 بازگشت", callback_data='admin_text_management')]
+    ]
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    query.edit_message_text("🔘 ویرایش متون دکمه‌ها", reply_markup=reply_markup)
+
+def admin_edit_text_start(update: Update, context: CallbackContext):
+    """Start editing a specific text"""
+    query = update.callback_query
+    query.answer()
+    
+    setting_key = query.data.replace('edit_text_', '')
+    context.user_data['editing_text'] = setting_key
+    
+    # Get current value
+    current_value = db.get_setting(setting_key)
+    
+    text_names = {
+        # Main messages
+        'welcome_message': 'پیام خوشامدگویی',
+        'contact_info': 'اطلاعات تماس',
+        'error_general': 'پیام خطای عمومی',
+        'operation_cancelled': 'پیام لغو عملیات',
+        
+        # AI messages
+        'ai_design_prompt': 'درخواست توضیح طرح',
+        'ai_design_processing': 'پیام در حال پردازش',
+        'ai_design_result': 'پیام نتیجه',
+        'ai_design_error': 'پیام خطا',
+        
+        # Booking messages
+        'booking_select_slot': 'انتخاب زمان',
+        'booking_no_slots': 'زمان موجود نیست',
+        'booking_slot_unavailable': 'زمان در دسترس نیست',
+        'booking_receipt_request': 'درخواست رسید',
+        'booking_receipt_received': 'رسید دریافت شد',
+        'booking_confirmed': 'رزرو تایید شد',
+        'booking_rejected': 'رزرو رد شد',
+        'booking_discount_select': 'انتخاب با تخفیف',
+        
+        # Button texts
+        'button_ai_design': 'دکمه طراحی',
+        'button_book_appointment': 'دکمه رزرو',
+        'button_contact': 'دکمه تماس',
+        'button_admin_panel': 'دکمه پنل ادمین',
+        'booking_discount_button': 'دکمه رزرو با تخفیف',
+        'back_button': 'دکمه بازگشت',
+        'cancel_button': 'دکمه لغو',
+        'admin_approve_button': 'دکمه تایید ادمین',
+        'admin_reject_button': 'دکمه رد ادمین'
+    }
+    
+    text_name = text_names.get(setting_key, setting_key)
+    
+    query.edit_message_text(
+        f"ویرایش {text_name}\n\nمتن فعلی:\n{current_value}\n\nمتن جدید را وارد کنید:",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 لغو", callback_data='admin_text_management')]])
+    )
+    
+    return ADMIN_EDIT_TEXT
+
+def admin_edit_text_process(update: Update, context: CallbackContext):
+    """Process text edit"""
+    new_value = update.message.text
+    setting_key = context.user_data.get('editing_text')
+    
+    if not setting_key:
+        update.message.reply_text("خطا در پردازش. لطفاً دوباره تلاش کنید.")
+        return ConversationHandler.END
+    
+    try:
+        db.set_setting(setting_key, new_value)
+        
+        text_names = {
+            # Main messages
+            'welcome_message': 'پیام خوشامدگویی',
+            'contact_info': 'اطلاعات تماس',
+            'error_general': 'پیام خطای عمومی',
+            'operation_cancelled': 'پیام لغو عملیات',
+            
+            # AI messages  
+            'ai_design_prompt': 'درخواست توضیح طرح',
+            'ai_design_processing': 'پیام در حال پردازش',
+            'ai_design_result': 'پیام نتیجه',
+            'ai_design_error': 'پیام خطا',
+            
+            # Booking messages
+            'booking_select_slot': 'انتخاب زمان',
+            'booking_no_slots': 'زمان موجود نیست',
+            'booking_slot_unavailable': 'زمان در دسترس نیست',
+            'booking_receipt_request': 'درخواست رسید',
+            'booking_receipt_received': 'رسید دریافت شد',
+            'booking_confirmed': 'رزرو تایید شد',
+            'booking_rejected': 'رزرو رد شد',
+            'booking_discount_select': 'انتخاب با تخفیف',
+            
+            # Button texts
+            'button_ai_design': 'دکمه طراحی',
+            'button_book_appointment': 'دکمه رزرو',
+            'button_contact': 'دکمه تماس',
+            'button_admin_panel': 'دکمه پنل ادمین',
+            'booking_discount_button': 'دکمه رزرو با تخفیف',
+            'back_button': 'دکمه بازگشت',
+            'cancel_button': 'دکمه لغو',
+            'admin_approve_button': 'دکمه تایید ادمین',
+            'admin_reject_button': 'دکمه رد ادمین'
+        }
+        
+        text_name = text_names.get(setting_key, setting_key)
+        
+        update.message.reply_text(
+            f"✅ {text_name} با موفقیت به‌روزرسانی شد.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='admin_text_management')]])
+        )
+    except Exception as e:
+        logger.error(f"Error updating text setting: {e}")
+        update.message.reply_text(
+            "❌ خطا در به‌روزرسانی متن.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='admin_text_management')]])
+        )
+    
+    return ConversationHandler.END
 
 def cancel_admin_conversation(update: Update, context: CallbackContext):
     """Cancel admin conversation"""

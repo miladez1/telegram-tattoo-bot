@@ -18,7 +18,9 @@ from admin_handlers import (
     admin_settings_menu, admin_edit_setting_start, admin_edit_setting_process,
     admin_broadcast_start, admin_broadcast_process, admin_api_key_start,
     admin_api_key_process, admin_stats, cancel_admin_conversation,
-    ADMIN_ADD_SLOT, ADMIN_EDIT_SETTING, ADMIN_BROADCAST, ADMIN_SET_API_KEY
+    admin_text_management, admin_main_messages, admin_ai_messages, admin_booking_messages,
+    admin_button_texts, admin_edit_text_start, admin_edit_text_process,
+    ADMIN_ADD_SLOT, ADMIN_EDIT_SETTING, ADMIN_BROADCAST, ADMIN_SET_API_KEY, ADMIN_EDIT_TEXT
 )
 
 # Enable logging
@@ -137,6 +139,17 @@ def main():
         ]
     )
 
+    admin_text_edit_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(admin_edit_text_start, pattern='edit_text_.*')],
+        states={
+            ADMIN_EDIT_TEXT: [MessageHandler(Filters.text & ~Filters.command, admin_edit_text_process)]
+        },
+        fallbacks=[
+            CommandHandler('cancel', cancel_admin_conversation),
+            CallbackQueryHandler(lambda u, c: admin_text_management(u, c), pattern='admin_text_management')
+        ]
+    )
+
     # Command handlers
     dp.add_handler(CommandHandler("start", start))
     dp.add_handler(CommandHandler("admin", admin_panel))
@@ -148,6 +161,7 @@ def main():
     dp.add_handler(admin_edit_setting_handler)
     dp.add_handler(admin_broadcast_handler)
     dp.add_handler(admin_api_key_handler)
+    dp.add_handler(admin_text_edit_handler)
 
     # Callback query handlers
     dp.add_handler(CallbackQueryHandler(button_handler, pattern='^(book_appointment|contact|book_appointment_discount|back_to_main|book_discount_.*)$'))
@@ -159,6 +173,11 @@ def main():
     dp.add_handler(CallbackQueryHandler(admin_delete_slot_confirm, pattern='delete_slot_.*'))
     dp.add_handler(CallbackQueryHandler(admin_settings_menu, pattern='admin_settings'))
     dp.add_handler(CallbackQueryHandler(admin_stats, pattern='admin_stats'))
+    dp.add_handler(CallbackQueryHandler(admin_text_management, pattern='admin_text_management'))
+    dp.add_handler(CallbackQueryHandler(admin_main_messages, pattern='admin_main_messages'))
+    dp.add_handler(CallbackQueryHandler(admin_ai_messages, pattern='admin_ai_messages'))
+    dp.add_handler(CallbackQueryHandler(admin_booking_messages, pattern='admin_booking_messages'))
+    dp.add_handler(CallbackQueryHandler(admin_button_texts, pattern='admin_button_texts'))
 
     # Error handler
     dp.add_error_handler(error_handler)
