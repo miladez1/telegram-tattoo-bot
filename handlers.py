@@ -73,7 +73,13 @@ def button_handler(update: Update, context: CallbackContext):
 def start_ai_design(query, context):
     """Start AI design conversation"""
     query.edit_message_text(
-        "لطفاً توضیحات کاملی از طرحی که در ذهن دارید بنویسید (مثلاً: یک شیر با تاج به سبک رئالیسم روی ساعد دست).",
+        "لطفاً توضیحات کاملی از طرحی که در ذهن دارید بنویسید:\n\n"
+        "مثال‌ها:\n"
+        "• یک عقاب با بال‌های باز به سبک بلک ورک\n"
+        "• طرح هندسی مثلث‌های متقابل روی مچ دست\n"
+        "• یک جمجمه با چشم‌های درخشان به سبک رئالیسم\n"
+        "• اژدهای آسیایی حول ساعد دست به سبک ترایبال\n"
+        "• کهکشان راه شیری روی پشت دست به سبک دات ورک",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_main')]])
     )
     return AI_DESIGN_DESCRIPTION
@@ -118,11 +124,19 @@ def handle_ai_design_description(update: Update, context: CallbackContext):
     return ConversationHandler.END
 
 def call_ai_api(description):
-    """Call AI API to generate tattoo design (mock implementation)"""
+    """Call AI API to generate tattoo design with enhanced prompt engineering"""
     api_key = db.get_setting('ai_api_key')
     
     if not api_key:
+        logger.warning("AI API key not configured")
         return None
+    
+    # Enhanced prompt engineering to reduce flower bias
+    # Add specific tattoo style constraints and avoid botanical defaults
+    enhanced_prompt = construct_tattoo_prompt(description)
+    
+    # Log the prompt for debugging
+    logger.info(f"AI Prompt constructed: {enhanced_prompt}")
     
     # This is a mock implementation
     # Replace with actual AI API call (OpenAI DALL-E, Stability AI, etc.)
@@ -133,9 +147,11 @@ def call_ai_api(description):
         }
         
         data = {
-            'prompt': f"Tattoo design: {description}",
+            'prompt': enhanced_prompt,
             'n': 1,
-            'size': '1024x1024'
+            'size': '1024x1024',
+            'style': 'vivid',  # For more artistic tattoo-like results
+            'quality': 'hd'    # Higher quality for tattoo designs
         }
         
         # Mock response - replace with actual API call
@@ -144,11 +160,59 @@ def call_ai_api(description):
         #     return response.json()['data'][0]['url']
         
         # For testing, return a placeholder image
+        logger.info(f"Mock API call successful for prompt: {enhanced_prompt[:50]}...")
         return "https://via.placeholder.com/512x512.png?text=Generated+Tattoo+Design"
         
     except Exception as e:
         logger.error(f"AI API call failed: {e}")
         return None
+
+def construct_tattoo_prompt(user_description):
+    """
+    Construct an enhanced tattoo prompt that reduces flower bias
+    and focuses on diverse tattoo art styles
+    """
+    # Clean and analyze user description
+    cleaned_description = user_description.strip()
+    
+    # Check if user specifically wants floral elements
+    floral_keywords = ['گل', 'flower', 'rose', 'رز', 'botanical', 'leaf', 'برگ', 'شاخه', 'branch']
+    user_wants_floral = any(keyword.lower() in cleaned_description.lower() for keyword in floral_keywords)
+    
+    # Base tattoo prompt with professional tattoo terminology
+    base_prompt = "Professional tattoo design artwork, black ink lineart, tattoo flash style"
+    
+    # Add the user's description
+    main_prompt = f"{base_prompt}, {cleaned_description}"
+    
+    # Add style constraints to prevent default flowers (only if user didn't request floral)
+    if not user_wants_floral:
+        anti_floral_constraints = [
+            "non-floral design",
+            "bold geometric or figurative elements", 
+            "traditional tattoo motifs",
+            "avoid botanical patterns"
+        ]
+        constraint_text = ", ".join(anti_floral_constraints)
+        main_prompt += f", {constraint_text}"
+    
+    # Add positive tattoo style guidance
+    style_guidance = [
+        "high contrast black ink",
+        "clean linework", 
+        "tattoo stencil ready",
+        "professional tattoo art style"
+    ]
+    
+    final_prompt = f"{main_prompt}, {', '.join(style_guidance)}"
+    
+    # Ensure prompt isn't too long (most APIs have limits)
+    if len(final_prompt) > 400:
+        # Truncate while keeping essential parts
+        essential_parts = f"{base_prompt}, {cleaned_description}, non-floral, professional tattoo art"
+        final_prompt = essential_parts[:400]
+    
+    return final_prompt
 
 def show_available_slots(query, context):
     """Show available appointment slots"""
