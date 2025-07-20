@@ -180,10 +180,8 @@ def call_ai_api(description):
         # Prepare the prompt for tattoo design
         tattoo_prompt = f"Black and white tattoo design: {description}, detailed line art, tattoo style, clean lines, professional tattoo artwork"
         
-        data = {
-            'prompt': tattoo_prompt,
-            'width': 512,
-            'height': 512,
+        files = {
+            'prompt': (None, tattoo_prompt, 'text/plain')
         }
         
         logger.info(f"Calling ClipDrop API with prompt: {tattoo_prompt}")
@@ -191,7 +189,7 @@ def call_ai_api(description):
         response = requests.post(
             AI_API_CONFIG['api_url'], 
             headers=headers, 
-            data=data,
+            files=files,
             timeout=30
         )
         
