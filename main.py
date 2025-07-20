@@ -206,7 +206,7 @@ def main():
     dp.add_handler(admin_text_edit_handler)
 
     # Callback query handlers
-    dp.add_handler(CallbackQueryHandler(button_handler, pattern='^(book_appointment|contact|book_appointment_discount|back_to_main|book_discount_.*)$'))
+    dp.add_handler(CallbackQueryHandler(button_handler, pattern='^(ai_design|book_appointment|contact|book_appointment_discount|back_to_main|book_slot_.*|book_discount_.*)$'))
     dp.add_handler(CallbackQueryHandler(handle_reservation_approval, pattern='^(approve_reservation_|reject_reservation_).*'))
     dp.add_handler(CallbackQueryHandler(admin_panel, pattern='admin_panel'))
     dp.add_handler(CallbackQueryHandler(admin_slots_menu, pattern='admin_slots'))

@@ -5,7 +5,7 @@ import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, ConversationHandler
 from database import Database
-from config import ADMIN_IDS, AI_API_CONFIG
+from config import ADMIN_IDS, AI_API_CONFIG, PERSIAN_TEXTS
 
 logger = logging.getLogger(__name__)
 
@@ -66,20 +66,36 @@ def button_handler(update: Update, context: CallbackContext):
     query = update.callback_query
     query.answer()
     
-    if query.data == 'ai_design':
-        start_ai_design(query, context)
-    elif query.data == 'book_appointment':
-        show_available_slots(query, context)
-    elif query.data == 'contact':
-        show_contact_info(query, context)
-    elif query.data.startswith('book_slot_'):
-        slot_id = int(query.data.split('_')[2])
-        book_slot(query, context, slot_id)
-    elif query.data.startswith('book_discount_'):
-        slot_id = int(query.data.split('_')[2])
-        book_slot_with_discount(query, context, slot_id)
-    elif query.data == 'back_to_main':
-        back_to_main_menu(query, context)
+    try:
+        if query.data == 'ai_design':
+            start_ai_design(query, context)
+        elif query.data == 'book_appointment':
+            show_available_slots(query, context)
+        elif query.data == 'book_appointment_discount':
+            book_slot_with_discount(query, context)
+        elif query.data == 'contact':
+            show_contact_info(query, context)
+        elif query.data.startswith('book_slot_'):
+            slot_id = int(query.data.split('_')[2])
+            book_slot(query, context, slot_id)
+        elif query.data.startswith('book_discount_'):
+            slot_id = int(query.data.split('_')[2])
+            book_slot_with_discount(query, context, slot_id)
+        elif query.data == 'back_to_main':
+            back_to_main_menu(query, context)
+        else:
+            # Log unhandled callback data for debugging
+            logger.warning(f"Unhandled callback data in button_handler: {query.data}")
+            
+    except Exception as e:
+        logger.error(f"Error in button_handler for {query.data}: {e}")
+        try:
+            query.edit_message_text(
+                "خطایی رخ داده است. لطفاً دوباره تلاش کنید.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 بازگشت", callback_data='back_to_main')]])
+            )
+        except Exception as edit_e:
+            logger.error(f"Error sending error message: {edit_e}")
 
 def start_ai_design(query, context):
     """Start AI design conversation"""
