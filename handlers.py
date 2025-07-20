@@ -78,6 +78,8 @@ def button_handler(update: Update, context: CallbackContext):
     elif query.data.startswith('book_discount_'):
         slot_id = int(query.data.split('_')[2])
         book_slot_with_discount(query, context, slot_id)
+    elif query.data == 'book_appointment_discount':
+        book_slot_with_discount(query, context, None)
     elif query.data == 'back_to_main':
         back_to_main_menu(query, context)
 
@@ -103,8 +105,13 @@ def handle_ai_design_description(update: Update, context: CallbackContext):
     discount_button_text = db.get_setting('booking_discount_button') or PERSIAN_TEXTS['booking_discount_button']
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
-    # Show processing message
-    processing_msg = update.message.reply_text(processing_message)
+    # Check if Persian translation is needed and inform user
+    translation_notice = ""
+    if is_persian_text(description):
+        translation_notice = "\n🔄 متن فارسی شما به انگلیسی ترجمه می‌شود تا بهترین نتیجه از هوش مصنوعی دریافت شود."
+    
+    # Show processing message with translation notice
+    processing_msg = update.message.reply_text(processing_message + translation_notice)
     
     # Call AI API
     try:
@@ -163,6 +170,96 @@ def handle_ai_design_description(update: Update, context: CallbackContext):
     
     return ConversationHandler.END
 
+def is_persian_text(text):
+    """Detect if text contains Persian characters"""
+    persian_chars = set('\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF')
+    for char in text:
+        if char in persian_chars or '\u0600' <= char <= '\u06FF':
+            return True
+    return False
+
+def translate_persian_to_english(persian_text):
+    """Simple Persian to English translation for tattoo-related terms"""
+    # Common tattoo-related Persian to English dictionary
+    translations = {
+        # Animals
+        'شیر': 'lion',
+        'عقاب': 'eagle', 
+        'گرگ': 'wolf',
+        'پلنگ': 'leopard',
+        'اژدها': 'dragon',
+        'اژدها': 'dragon',
+        'مار': 'snake',
+        'پروانه': 'butterfly',
+        'گل': 'flower',
+        'رز': 'rose',
+        'خورشید': 'sun',
+        'ماه': 'moon',
+        'ستاره': 'star',
+        'قلب': 'heart',
+        'چشم': 'eye',
+        'دست': 'hand',
+        'بال': 'wing',
+        'درخت': 'tree',
+        'کوه': 'mountain',
+        'دریا': 'sea',
+        'آتش': 'fire',
+        'آب': 'water',
+        'تاج': 'crown',
+        'شمشیر': 'sword',
+        'صلیب': 'cross',
+        'ملک': 'angel',
+        'فرشته': 'angel',
+        'جمجمه': 'skull',
+        'استخوان': 'bone',
+        # Styles
+        'رئالیسم': 'realism',
+        'سنتی': 'traditional',
+        'جدید': 'modern',
+        'سیاه': 'black',
+        'سفید': 'white',
+        'رنگی': 'colorful',
+        'خط': 'line',
+        'طرح': 'design',
+        'نقش': 'pattern',
+        # Body parts
+        'بازو': 'arm',
+        'ساعد': 'forearm',
+        'دست': 'hand',
+        'پا': 'leg',
+        'کمر': 'back',
+        'سینه': 'chest',
+        'گردن': 'neck',
+        'شانه': 'shoulder',
+        # Common words
+        'با': 'with',
+        'روی': 'on',
+        'در': 'in',
+        'به': 'in',
+        'از': 'from',
+        'برای': 'for',
+        'یک': 'a',
+        'بزرگ': 'big',
+        'کوچک': 'small',
+        'زیبا': 'beautiful',
+        'قدرتمند': 'powerful'
+    }
+    
+    # Simple word-by-word translation
+    words = persian_text.split()
+    translated_words = []
+    
+    for word in words:
+        # Remove punctuation for matching
+        clean_word = word.strip('.,!?؟').lower()
+        if clean_word in translations:
+            translated_words.append(translations[clean_word])
+        else:
+            # Keep unknown words as is (might be names or specific terms)
+            translated_words.append(word)
+    
+    return ' '.join(translated_words)
+
 def call_ai_api(description):
     """Call ClipDrop API to generate tattoo design"""
     api_key = db.get_setting('ai_api_key')
@@ -172,6 +269,12 @@ def call_ai_api(description):
         return None
     
     try:
+        # Check if description contains Persian text and translate if needed
+        original_description = description
+        if is_persian_text(description):
+            description = translate_persian_to_english(description)
+            logger.info(f"Translated Persian text: '{original_description}' -> '{description}'")
+        
         # ClipDrop API implementation
         headers = {
             'x-api-key': api_key,
