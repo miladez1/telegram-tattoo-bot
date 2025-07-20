@@ -5,7 +5,7 @@ import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, ConversationHandler
 from database import Database
-from config import ADMIN_IDS, AI_API_CONFIG
+from config import ADMIN_IDS, AI_API_CONFIG, PERSIAN_TEXTS
 
 logger = logging.getLogger(__name__)
 
@@ -67,19 +67,13 @@ def button_handler(update: Update, context: CallbackContext):
     query.answer()
     
     if query.data == 'ai_design':
-        start_ai_design(query, context)
-    elif query.data == 'book_appointment':
-        show_available_slots(query, context)
+        return start_ai_design(query, context)
     elif query.data == 'contact':
         show_contact_info(query, context)
-    elif query.data.startswith('book_slot_'):
-        slot_id = int(query.data.split('_')[2])
-        book_slot(query, context, slot_id)
-    elif query.data.startswith('book_discount_'):
-        slot_id = int(query.data.split('_')[2])
-        book_slot_with_discount(query, context, slot_id)
     elif query.data == 'back_to_main':
         back_to_main_menu(query, context)
+    
+    return None  # Default return for non-conversation actions
 
 def start_ai_design(query, context):
     """Start AI design conversation"""
@@ -103,8 +97,13 @@ def handle_ai_design_description(update: Update, context: CallbackContext):
     discount_button_text = db.get_setting('booking_discount_button') or PERSIAN_TEXTS['booking_discount_button']
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
-    # Show processing message
-    processing_msg = update.message.reply_text(processing_message)
+    # Check if Persian translation is needed and inform user
+    translation_notice = ""
+    if is_persian_text(description):
+        translation_notice = "\n🔄 متن فارسی شما به انگلیسی ترجمه می‌شود تا بهترین نتیجه از هوش مصنوعی دریافت شود."
+    
+    # Show processing message with translation notice
+    processing_msg = update.message.reply_text(processing_message + translation_notice)
     
     # Call AI API
     try:
@@ -163,6 +162,96 @@ def handle_ai_design_description(update: Update, context: CallbackContext):
     
     return ConversationHandler.END
 
+def is_persian_text(text):
+    """Detect if text contains Persian characters"""
+    persian_chars = set('\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF')
+    for char in text:
+        if char in persian_chars or '\u0600' <= char <= '\u06FF':
+            return True
+    return False
+
+def translate_persian_to_english(persian_text):
+    """Simple Persian to English translation for tattoo-related terms"""
+    # Common tattoo-related Persian to English dictionary
+    translations = {
+        # Animals
+        'شیر': 'lion',
+        'عقاب': 'eagle', 
+        'گرگ': 'wolf',
+        'پلنگ': 'leopard',
+        'اژدها': 'dragon',
+        'اژدها': 'dragon',
+        'مار': 'snake',
+        'پروانه': 'butterfly',
+        'گل': 'flower',
+        'رز': 'rose',
+        'خورشید': 'sun',
+        'ماه': 'moon',
+        'ستاره': 'star',
+        'قلب': 'heart',
+        'چشم': 'eye',
+        'دست': 'hand',
+        'بال': 'wing',
+        'درخت': 'tree',
+        'کوه': 'mountain',
+        'دریا': 'sea',
+        'آتش': 'fire',
+        'آب': 'water',
+        'تاج': 'crown',
+        'شمشیر': 'sword',
+        'صلیب': 'cross',
+        'ملک': 'angel',
+        'فرشته': 'angel',
+        'جمجمه': 'skull',
+        'استخوان': 'bone',
+        # Styles
+        'رئالیسم': 'realism',
+        'سنتی': 'traditional',
+        'جدید': 'modern',
+        'سیاه': 'black',
+        'سفید': 'white',
+        'رنگی': 'colorful',
+        'خط': 'line',
+        'طرح': 'design',
+        'نقش': 'pattern',
+        # Body parts
+        'بازو': 'arm',
+        'ساعد': 'forearm',
+        'دست': 'hand',
+        'پا': 'leg',
+        'کمر': 'back',
+        'سینه': 'chest',
+        'گردن': 'neck',
+        'شانه': 'shoulder',
+        # Common words
+        'با': 'with',
+        'روی': 'on',
+        'در': 'in',
+        'به': 'in',
+        'از': 'from',
+        'برای': 'for',
+        'یک': 'a',
+        'بزرگ': 'big',
+        'کوچک': 'small',
+        'زیبا': 'beautiful',
+        'قدرتمند': 'powerful'
+    }
+    
+    # Simple word-by-word translation
+    words = persian_text.split()
+    translated_words = []
+    
+    for word in words:
+        # Remove punctuation for matching
+        clean_word = word.strip('.,!?؟').lower()
+        if clean_word in translations:
+            translated_words.append(translations[clean_word])
+        else:
+            # Keep unknown words as is (might be names or specific terms)
+            translated_words.append(word)
+    
+    return ' '.join(translated_words)
+
 def call_ai_api(description):
     """Call ClipDrop API to generate tattoo design"""
     api_key = db.get_setting('ai_api_key')
@@ -172,7 +261,13 @@ def call_ai_api(description):
         return None
     
     try:
-        # ClipDrop API implementation
+        # Check if description contains Persian text and translate if needed
+        original_description = description
+        if is_persian_text(description):
+            description = translate_persian_to_english(description)
+            logger.info(f"Translated Persian text: '{original_description}' -> '{description}'")
+        
+        # ClipDrop API implementation - using files parameter as required by API
         headers = {
             'x-api-key': api_key,
         }
@@ -180,10 +275,8 @@ def call_ai_api(description):
         # Prepare the prompt for tattoo design
         tattoo_prompt = f"Black and white tattoo design: {description}, detailed line art, tattoo style, clean lines, professional tattoo artwork"
         
-        data = {
-            'prompt': tattoo_prompt,
-            'width': 512,
-            'height': 512,
+        files = {
+            'prompt': (None, tattoo_prompt, 'text/plain')
         }
         
         logger.info(f"Calling ClipDrop API with prompt: {tattoo_prompt}")
@@ -191,7 +284,7 @@ def call_ai_api(description):
         response = requests.post(
             AI_API_CONFIG['api_url'], 
             headers=headers, 
-            data=data,
+            files=files,
             timeout=30
         )
         
@@ -234,10 +327,19 @@ def show_available_slots(query, context):
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
     if not slots:
-        query.edit_message_text(
-            no_slots_message,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as e:
+            logger.warning(f"Could not edit message, sending new message: {e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     keyboard = []
@@ -246,10 +348,19 @@ def show_available_slots(query, context):
     
     keyboard.append([InlineKeyboardButton(back_button_text, callback_data='back_to_main')])
     
-    query.edit_message_text(
-        select_slot_message,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            select_slot_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=select_slot_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 def book_slot(query, context, slot_id, discount=False):
     """Book an appointment slot"""
@@ -269,10 +380,19 @@ def book_slot(query, context, slot_id, discount=False):
     cancel_button_text = db.get_setting('cancel_button') or PERSIAN_TEXTS['cancel_button']
     
     if not slot_text:
-        query.edit_message_text(
-            slot_unavailable_message,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                slot_unavailable_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as e:
+            logger.warning(f"Could not edit message, sending new message: {e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=slot_unavailable_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     # Create reservation
@@ -282,10 +402,19 @@ def book_slot(query, context, slot_id, discount=False):
         context.user_data['selected_slot_text'] = slot_text
     except Exception as e:
         logger.error(f"Error creating reservation: {e}")
-        query.edit_message_text(
-            "خطا در ایجاد رزرو. لطفاً دوباره تلاش کنید.",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                "خطا در ایجاد رزرو. لطفاً دوباره تلاش کنید.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as edit_e:
+            logger.warning(f"Could not edit message, sending new message: {edit_e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text="خطا در ایجاد رزرو. لطفاً دوباره تلاش کنید.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     # Get payment details
@@ -315,10 +444,19 @@ def book_slot(query, context, slot_id, discount=False):
 
 لطفاً اسکرین‌شات رسید را در همین چت ارسال کنید."""
     
-    query.edit_message_text(
-        payment_message,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{cancel_button_text} رزرو", callback_data='back_to_main')]])
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            payment_message,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{cancel_button_text} رزرو", callback_data='back_to_main')]])
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=payment_message,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(f"{cancel_button_text} رزرو", callback_data='back_to_main')]])
+        )
     
     return BOOKING_RECEIPT_UPLOAD
 
@@ -327,8 +465,9 @@ def book_slot_with_discount(query, context, slot_id=None):
     if slot_id is None:
         # Show available slots for discount booking
         show_available_slots_for_discount(query, context)
+        return None  # No conversation state change when showing slots
     else:
-        book_slot(query, context, slot_id, discount=True)
+        return book_slot(query, context, slot_id, discount=True)
 
 def show_available_slots_for_discount(query, context):
     """Show available slots for discount booking"""
@@ -340,10 +479,19 @@ def show_available_slots_for_discount(query, context):
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
     if not slots:
-        query.edit_message_text(
-            no_slots_message,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as e:
+            logger.warning(f"Could not edit message, sending new message: {e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     keyboard = []
@@ -352,10 +500,19 @@ def show_available_slots_for_discount(query, context):
     
     keyboard.append([InlineKeyboardButton(back_button_text, callback_data='back_to_main')])
     
-    query.edit_message_text(
-        discount_select_message,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            discount_select_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=discount_select_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 def handle_receipt_upload(update: Update, context: CallbackContext):
     """Handle receipt photo upload"""
@@ -441,10 +598,19 @@ def show_contact_info(query, context):
     contact_info = db.get_setting('contact_info')
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
-    query.edit_message_text(
-        contact_info,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            contact_info,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=contact_info,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+        )
 
 def back_to_main_menu(query, context):
     """Return to main menu"""
@@ -468,7 +634,17 @@ def back_to_main_menu(query, context):
         keyboard.append([InlineKeyboardButton(admin_panel_text, callback_data='admin_panel')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    query.edit_message_text(welcome_message, reply_markup=reply_markup)
+    
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(welcome_message, reply_markup=reply_markup)
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=welcome_message,
+            reply_markup=reply_markup
+        )
 
 def handle_reservation_approval(update: Update, context: CallbackContext):
     """Handle admin reservation approval/rejection"""
