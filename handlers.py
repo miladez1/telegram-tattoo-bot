@@ -5,7 +5,7 @@ import requests
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext, ConversationHandler
 from database import Database
-from config import ADMIN_IDS, AI_API_CONFIG
+from config import ADMIN_IDS, AI_API_CONFIG, PERSIAN_TEXTS
 
 logger = logging.getLogger(__name__)
 
@@ -443,10 +443,19 @@ def show_available_slots_for_discount(query, context):
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
     if not slots:
-        query.edit_message_text(
-            no_slots_message,
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-        )
+        # Try to edit first, if it fails send a new message
+        try:
+            query.edit_message_text(
+                no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
+        except Exception as e:
+            logger.warning(f"Could not edit message, sending new message: {e}")
+            context.bot.send_message(
+                chat_id=query.message.chat_id,
+                text=no_slots_message,
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+            )
         return
     
     keyboard = []
@@ -455,10 +464,19 @@ def show_available_slots_for_discount(query, context):
     
     keyboard.append([InlineKeyboardButton(back_button_text, callback_data='back_to_main')])
     
-    query.edit_message_text(
-        discount_select_message,
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            discount_select_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=discount_select_message,
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
 
 def handle_receipt_upload(update: Update, context: CallbackContext):
     """Handle receipt photo upload"""
@@ -544,10 +562,19 @@ def show_contact_info(query, context):
     contact_info = db.get_setting('contact_info')
     back_button_text = db.get_setting('back_button') or PERSIAN_TEXTS['back_button']
     
-    query.edit_message_text(
-        contact_info,
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
-    )
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(
+            contact_info,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+        )
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=contact_info,
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(back_button_text, callback_data='back_to_main')]])
+        )
 
 def back_to_main_menu(query, context):
     """Return to main menu"""
@@ -571,7 +598,17 @@ def back_to_main_menu(query, context):
         keyboard.append([InlineKeyboardButton(admin_panel_text, callback_data='admin_panel')])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
-    query.edit_message_text(welcome_message, reply_markup=reply_markup)
+    
+    # Try to edit first, if it fails send a new message
+    try:
+        query.edit_message_text(welcome_message, reply_markup=reply_markup)
+    except Exception as e:
+        logger.warning(f"Could not edit message, sending new message: {e}")
+        context.bot.send_message(
+            chat_id=query.message.chat_id,
+            text=welcome_message,
+            reply_markup=reply_markup
+        )
 
 def handle_reservation_approval(update: Update, context: CallbackContext):
     """Handle admin reservation approval/rejection"""
