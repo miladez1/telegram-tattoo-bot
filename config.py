@@ -52,7 +52,11 @@ PERSIAN_TEXTS = {
 AI_API_CONFIG = {
     'api_key': '',
     'api_url': 'https://api.openai.com/v1/images/generations',  # Example endpoint
-    'model': 'dall-e-3'
+    'model': 'dall-e-3',
+    # Anti-flower bias configuration
+    'enable_anti_flower': True,
+    'anti_flower_strength': 'medium',  # 'light', 'medium', 'strong'
+    'fallback_prompts': True
 }
 
 # Scheduler Configuration

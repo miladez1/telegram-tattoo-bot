@@ -123,7 +123,7 @@ def handle_ai_design_description(update: Update, context: CallbackContext):
     
     return ConversationHandler.END
 
-def call_ai_api(description):
+def call_ai_api(description, use_fallback=False):
     """Call AI API to generate tattoo design with enhanced prompt engineering"""
     api_key = db.get_setting('ai_api_key')
     
@@ -131,9 +131,17 @@ def call_ai_api(description):
         logger.warning("AI API key not configured")
         return None
     
-    # Enhanced prompt engineering to reduce flower bias
-    # Add specific tattoo style constraints and avoid botanical defaults
-    enhanced_prompt = construct_tattoo_prompt(description)
+    # Get fallback setting from database
+    fallback_enabled = db.get_setting('enable_fallback_prompts') == 'true'
+    
+    # Choose prompt strategy
+    if use_fallback:
+        fallback_prompts = get_fallback_prompt(description)
+        enhanced_prompt = fallback_prompts[0]  # Use first fallback prompt
+        logger.info("Using fallback prompt strategy")
+    else:
+        # Enhanced prompt engineering to reduce flower bias
+        enhanced_prompt = construct_tattoo_prompt(description)
     
     # Log the prompt for debugging
     logger.info(f"AI Prompt constructed: {enhanced_prompt}")
@@ -157,7 +165,14 @@ def call_ai_api(description):
         # Mock response - replace with actual API call
         # response = requests.post(AI_API_CONFIG['api_url'], headers=headers, json=data)
         # if response.status_code == 200:
-        #     return response.json()['data'][0]['url']
+        #     result = response.json()['data'][0]['url']
+        #     
+        #     # If using fallback and it still seems floral, try another fallback
+        #     if use_fallback and fallback_enabled:
+        #         # Here you could implement additional fallback logic
+        #         pass
+        #     
+        #     return result
         
         # For testing, return a placeholder image
         logger.info(f"Mock API call successful for prompt: {enhanced_prompt[:50]}...")
@@ -165,6 +180,12 @@ def call_ai_api(description):
         
     except Exception as e:
         logger.error(f"AI API call failed: {e}")
+        
+        # Try fallback if enabled and not already using fallback
+        if not use_fallback and fallback_enabled:
+            logger.info("Primary API call failed, trying fallback strategy...")
+            return call_ai_api(description, use_fallback=True)
+        
         return None
 
 def construct_tattoo_prompt(user_description):
@@ -172,11 +193,15 @@ def construct_tattoo_prompt(user_description):
     Construct an enhanced tattoo prompt that reduces flower bias
     and focuses on diverse tattoo art styles
     """
+    # Get configuration from database
+    anti_flower_enabled = db.get_setting('enable_anti_flower') == 'true'
+    anti_flower_strength = db.get_setting('anti_flower_strength') or 'medium'
+    
     # Clean and analyze user description
     cleaned_description = user_description.strip()
     
     # Check if user specifically wants floral elements
-    floral_keywords = ['گل', 'flower', 'rose', 'رز', 'botanical', 'leaf', 'برگ', 'شاخه', 'branch']
+    floral_keywords = ['گل', 'flower', 'rose', 'رز', 'botanical', 'leaf', 'برگ', 'شاخه', 'branch', 'پتال', 'petal', 'bloom']
     user_wants_floral = any(keyword.lower() in cleaned_description.lower() for keyword in floral_keywords)
     
     # Base tattoo prompt with professional tattoo terminology
@@ -185,14 +210,25 @@ def construct_tattoo_prompt(user_description):
     # Add the user's description
     main_prompt = f"{base_prompt}, {cleaned_description}"
     
-    # Add style constraints to prevent default flowers (only if user didn't request floral)
-    if not user_wants_floral:
-        anti_floral_constraints = [
-            "non-floral design",
-            "bold geometric or figurative elements", 
-            "traditional tattoo motifs",
-            "avoid botanical patterns"
-        ]
+    # Apply anti-floral measures based on database settings
+    if anti_flower_enabled and not user_wants_floral:
+        # Different strength levels of anti-floral constraints
+        if anti_flower_strength == 'light':
+            anti_floral_constraints = ["non-floral design", "traditional tattoo motifs"]
+        elif anti_flower_strength == 'strong':
+            anti_floral_constraints = [
+                "non-floral design", "avoid botanical patterns", "avoid flowers completely",
+                "bold geometric or figurative elements", "traditional tattoo motifs",
+                "focus on animals, skulls, or geometric patterns"
+            ]
+        else:  # medium (default)
+            anti_floral_constraints = [
+                "non-floral design",
+                "bold geometric or figurative elements", 
+                "traditional tattoo motifs",
+                "avoid botanical patterns"
+            ]
+        
         constraint_text = ", ".join(anti_floral_constraints)
         main_prompt += f", {constraint_text}"
     
@@ -209,10 +245,28 @@ def construct_tattoo_prompt(user_description):
     # Ensure prompt isn't too long (most APIs have limits)
     if len(final_prompt) > 400:
         # Truncate while keeping essential parts
-        essential_parts = f"{base_prompt}, {cleaned_description}, non-floral, professional tattoo art"
+        essential_parts = f"{base_prompt}, {cleaned_description}"
+        if not user_wants_floral and anti_flower_enabled:
+            essential_parts += ", non-floral design"
+        essential_parts += ", professional tattoo art"
         final_prompt = essential_parts[:400]
     
     return final_prompt
+
+def get_fallback_prompt(user_description):
+    """
+    Generate a fallback prompt if the primary prompt fails to generate good results
+    """
+    cleaned_description = user_description.strip()
+    
+    # Simple, direct approach for fallback
+    fallback_prompts = [
+        f"Black ink tattoo design of {cleaned_description}, professional tattoo art",
+        f"Traditional tattoo style {cleaned_description}, bold black lines",
+        f"Minimalist tattoo design: {cleaned_description}, clean lineart"
+    ]
+    
+    return fallback_prompts
 
 def show_available_slots(query, context):
     """Show available appointment slots"""

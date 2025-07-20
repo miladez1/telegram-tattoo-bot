@@ -74,7 +74,11 @@ class Database:
             'deposit_amount': PERSIAN_TEXTS['deposit_amount'],
             'force_join_channel': '',
             'ai_api_key': '',
-            'contact_info': PERSIAN_TEXTS['contact_info']
+            'contact_info': PERSIAN_TEXTS['contact_info'],
+            # AI Anti-flower settings
+            'enable_anti_flower': 'true',
+            'anti_flower_strength': 'medium',  # light, medium, strong
+            'enable_fallback_prompts': 'true'
         }
         
         for key, value in default_settings.items():
