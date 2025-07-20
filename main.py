@@ -123,7 +123,7 @@ def main():
 
     # Booking Conversation Handler  
     booking_conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(lambda u, c: None, pattern='book_slot_.*')],
+        entry_points=[],  # No entry points needed since booking is handled by button_handler
         states={
             BOOKING_RECEIPT_UPLOAD: [
                 MessageHandler(Filters.photo, handle_receipt_upload),
@@ -206,7 +206,7 @@ def main():
     dp.add_handler(admin_text_edit_handler)
 
     # Callback query handlers
-    dp.add_handler(CallbackQueryHandler(button_handler, pattern='^(book_appointment|contact|book_appointment_discount|back_to_main|book_discount_.*)$'))
+    dp.add_handler(CallbackQueryHandler(button_handler, pattern='^(book_appointment|contact|book_appointment_discount|back_to_main|book_discount_.*|book_slot_.*)$'))
     dp.add_handler(CallbackQueryHandler(handle_reservation_approval, pattern='^(approve_reservation_|reject_reservation_).*'))
     dp.add_handler(CallbackQueryHandler(admin_panel, pattern='admin_panel'))
     dp.add_handler(CallbackQueryHandler(admin_slots_menu, pattern='admin_slots'))

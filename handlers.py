@@ -67,21 +67,23 @@ def button_handler(update: Update, context: CallbackContext):
     query.answer()
     
     if query.data == 'ai_design':
-        start_ai_design(query, context)
+        return start_ai_design(query, context)
     elif query.data == 'book_appointment':
         show_available_slots(query, context)
     elif query.data == 'contact':
         show_contact_info(query, context)
     elif query.data.startswith('book_slot_'):
         slot_id = int(query.data.split('_')[2])
-        book_slot(query, context, slot_id)
+        return book_slot(query, context, slot_id)
     elif query.data.startswith('book_discount_'):
         slot_id = int(query.data.split('_')[2])
-        book_slot_with_discount(query, context, slot_id)
+        return book_slot_with_discount(query, context, slot_id)
     elif query.data == 'book_appointment_discount':
-        book_slot_with_discount(query, context, None)
+        return book_slot_with_discount(query, context, None)
     elif query.data == 'back_to_main':
         back_to_main_menu(query, context)
+    
+    return None  # Default return for non-conversation actions
 
 def start_ai_design(query, context):
     """Start AI design conversation"""
@@ -430,8 +432,9 @@ def book_slot_with_discount(query, context, slot_id=None):
     if slot_id is None:
         # Show available slots for discount booking
         show_available_slots_for_discount(query, context)
+        return None  # No conversation state change when showing slots
     else:
-        book_slot(query, context, slot_id, discount=True)
+        return book_slot(query, context, slot_id, discount=True)
 
 def show_available_slots_for_discount(query, context):
     """Show available slots for discount booking"""
