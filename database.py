@@ -438,6 +438,65 @@ class Database:
             if conn:
                 conn.close()
 
+    def get_reservations_near_expiry(self, timeout_minutes=120, warning_minutes=30):
+        """Get reservations that will expire soon (for notifications)"""
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_name)
+            cursor = conn.cursor()
+            
+            # Get reservations that will expire in warning_minutes
+            warning_time = datetime.now() - timedelta(minutes=(timeout_minutes - warning_minutes))
+            
+            cursor.execute('''
+                SELECT r.id, r.user_id, s.slot_text, r.pending_time
+                FROM reservations r
+                JOIN slots s ON r.slot_id = s.id
+                WHERE r.status = 'pending' 
+                AND r.pending_time < ?
+                AND r.id NOT IN (
+                    SELECT reservation_id FROM expiry_warnings WHERE reservation_id = r.id
+                )
+            ''', (warning_time,))
+            
+            near_expiry = cursor.fetchall()
+            return near_expiry
+            
+        except Exception as e:
+            logger.error(f"Error getting reservations near expiry: {e}")
+            return []
+        finally:
+            if conn:
+                conn.close()
+
+    def mark_expiry_warning_sent(self, reservation_id):
+        """Mark that expiry warning has been sent for a reservation"""
+        conn = None
+        try:
+            conn = sqlite3.connect(self.db_name)
+            cursor = conn.cursor()
+            
+            # Create expiry_warnings table if it doesn't exist
+            cursor.execute('''
+                CREATE TABLE IF NOT EXISTS expiry_warnings (
+                    reservation_id INTEGER PRIMARY KEY,
+                    warning_sent_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                )
+            ''')
+            
+            cursor.execute('''
+                INSERT OR IGNORE INTO expiry_warnings (reservation_id)
+                VALUES (?)
+            ''', (reservation_id,))
+            
+            conn.commit()
+            
+        except Exception as e:
+            logger.error(f"Error marking expiry warning sent for reservation {reservation_id}: {e}")
+        finally:
+            if conn:
+                conn.close()
+
     def get_reservation_by_id(self, reservation_id):
         """Get reservation details by ID"""
         conn = None

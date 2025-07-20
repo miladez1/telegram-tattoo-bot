@@ -9,7 +9,7 @@ from config import BOT_TOKEN, SCHEDULER_CONFIG
 from database import Database
 from handlers import (
     start, button_handler, handle_ai_design_description, handle_receipt_upload,
-    handle_reservation_approval, cancel_conversation,
+    handle_reservation_approval, cancel_conversation, start_ai_design, back_to_main_menu,
     AI_DESIGN_DESCRIPTION, BOOKING_RECEIPT_UPLOAD
 )
 from admin_handlers import (
@@ -43,6 +43,43 @@ def cleanup_expired_reservations():
         except Exception as e:
             logger.error(f"Error cleaning up reservation {reservation_id}: {e}")
 
+def notify_expiring_reservations():
+    """Notify users about reservations that will expire soon"""
+    from telegram import Bot
+    import os
+    
+    # Get bot token from environment or config
+    bot_token = os.getenv('BOT_TOKEN', BOT_TOKEN)
+    bot = Bot(token=bot_token)
+    
+    db = Database()
+    near_expiry = db.get_reservations_near_expiry(
+        timeout_minutes=SCHEDULER_CONFIG['reservation_timeout_minutes'], 
+        warning_minutes=30  # Warn 30 minutes before expiry
+    )
+    
+    for reservation_id, user_id, slot_text, pending_time in near_expiry:
+        try:
+            # Calculate time remaining
+            from datetime import datetime, timedelta
+            expiry_time = pending_time + timedelta(minutes=SCHEDULER_CONFIG['reservation_timeout_minutes'])
+            time_remaining = expiry_time - datetime.now()
+            minutes_remaining = int(time_remaining.total_seconds() / 60)
+            
+            warning_message = f"""⚠️ هشدار انقضای رزرو
+
+رزرو شما برای زمان {slot_text} در {minutes_remaining} دقیقه دیگر منقضی می‌شود.
+
+اگر هنوز رسید پرداخت را ارسال نکرده‌اید، لطفاً سریع‌تر اقدام کنید تا رزرو شما لغو نشود."""
+            
+            bot.send_message(chat_id=user_id, text=warning_message)
+            db.mark_expiry_warning_sent(reservation_id)
+            
+            logger.info(f"Sent expiry warning for reservation {reservation_id} to user {user_id}")
+            
+        except Exception as e:
+            logger.error(f"Error sending expiry warning for reservation {reservation_id}: {e}")
+
 def error_handler(update, context):
     """Log Errors caused by Updates."""
     logger.warning('Update "%s" caused error "%s"', update, context.error)
@@ -62,6 +99,11 @@ def main():
         cleanup_expired_reservations,
         IntervalTrigger(minutes=5),  # Check every 5 minutes
         id='cleanup_expired_reservations'
+    )
+    scheduler.add_job(
+        notify_expiring_reservations,
+        IntervalTrigger(minutes=10),  # Check for expiring reservations every 10 minutes
+        id='notify_expiring_reservations'
     )
     scheduler.start()
 
