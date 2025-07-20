@@ -123,7 +123,7 @@ def main():
 
     # Booking Conversation Handler  
     booking_conv_handler = ConversationHandler(
-        entry_points=[CallbackQueryHandler(lambda u, c: None, pattern='book_slot_.*')],
+        entry_points=[CallbackQueryHandler(lambda u, c: book_slot(u.callback_query, c, int(u.callback_query.data.split('_')[2])), pattern='book_slot_.*')],
         states={
             BOOKING_RECEIPT_UPLOAD: [
                 MessageHandler(Filters.photo, handle_receipt_upload),
