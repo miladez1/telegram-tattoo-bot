@@ -10,6 +10,7 @@ from database import Database
 from handlers import (
     start, button_handler, handle_ai_design_description, handle_receipt_upload,
     handle_reservation_approval, cancel_conversation, start_ai_design, back_to_main_menu,
+    show_available_slots, book_slot, book_slot_with_discount,
     AI_DESIGN_DESCRIPTION, BOOKING_RECEIPT_UPLOAD
 )
 from admin_handlers import (
